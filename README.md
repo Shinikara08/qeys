@@ -1,6 +1,6 @@
 # Qeys — a no-look typing trainer
 
-![Qeys — train touch typing without looking down](assets/qeys-hero.jpg)
+![Qeys — train touch typing without looking down](assets/qeys.png)
 
 **Qeys** is a lightweight, always-on-top **QWERTY keyboard overlay** for Windows that
 mirrors your **real typing in any app or browser tab** in real time. Press a key
@@ -30,17 +30,17 @@ Qeys flips that:
 
 ## Features
 
-- 🌐 **Global** — captures keystrokes from any window via a system-wide hook
-- 🔀 **Two modes** (toggle in the bar):
+- **Global** — captures keystrokes from any window via a system-wide hook
+- **Two modes** (toggle in the bar):
   - **Test** — scored practice against target prompts
   - **Free** — a plain real-time mirror of whatever you type
-- 🎯 **Test mode** — target prompts with per-character correct/wrong coloring
-- 📊 **Live WPM + accuracy**, plus last-run and best-WPM, and a completed counter
-- 📌 **Always-on-top**, borderless, semi-transparent overlay
-- 🖱️ **Drag anywhere** to move · **bottom-right grip** to resize (keyboard rescales)
-- 🔆 **Instant light-up, slow fade** on release (tunable)
-- 🪟 **System tray icon** — Show / Hide / New prompt / Quit; ✕ minimizes to tray
-- 🏠 **F/J home-row markers** for blind finger placement
+- **Test mode** — target prompts with per-character correct/wrong coloring
+- **Live WPM + accuracy**, plus last-run and best-WPM, and a completed counter
+- **Always-on-top**, borderless, semi-transparent overlay
+- **Drag anywhere** to move · **bottom-right grip** to resize (keyboard rescales)
+- **Instant light-up, slow fade** on release (tunable)
+- **System tray icon** — Show / Hide / New prompt / Quit; the close button minimizes to tray
+- **F/J home-row markers** for blind finger placement
 
 ## Install & run
 
@@ -56,7 +56,7 @@ python qeys.py
 Double-click **`Qeys.vbs`** — it starts the app silently (no console window) and drops
 it into the system tray.
 
-> ⚠️ **Note on the `.vbs` launcher:** it runs cleanly on the machine where it was
+> **Note on the `.vbs` launcher:** it runs cleanly on the machine where it was
 > created. If you *download* or copy it to a **different** PC, Windows may show a
 > "Security Warning" / SmartScreen prompt (it flags `.vbs` files that arrive from the
 > internet), and some managed machines disable Windows Script Host entirely. On a new

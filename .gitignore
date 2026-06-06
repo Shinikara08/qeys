@@ -19,3 +19,6 @@ desktop.ini
 # local run artifacts
 err.log
 *.log
+
+# internal Echo archive (kept local / in JEFFREY_MD, not shipped to the public repo)
+summary.md
