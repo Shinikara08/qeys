@@ -68,8 +68,15 @@ COL_CURSOR = "#ffffff"      # character at the cursor
 
 # "Built by Qollab" badge — clicking it opens the agency site.
 LOGO_URL = "https://jeffreyquemuel.cloud/qorex"
-LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                         "assets", "qo_union_explore.png")
+
+
+def _resource_path(rel):
+    """Resolve a bundled asset path in dev and inside a PyInstaller one-file exe."""
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, rel)
+
+
+LOGO_PATH = _resource_path(os.path.join("assets", "qo_union_explore.png"))
 
 # Practice prompts. Mix of pangrams, home-row drills and flowing sentences.
 PROMPTS = [

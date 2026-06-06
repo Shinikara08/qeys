@@ -42,7 +42,15 @@ Qeys flips that:
 - **System tray icon** — Show / Hide / New prompt / Quit; the close button minimizes to tray
 - **F/J home-row markers** for blind finger placement
 
-## Install & run
+## Download (Windows, no Python needed)
+
+1. Open the [latest Release](https://github.com/Shinikara08/qeys/releases/latest) and download **`Qeys.exe`**.
+2. Double-click it. The first time, Windows SmartScreen shows **"Windows protected your PC"** because the build is not code-signed (normal for free, independent apps). Click **More info**, then **Run anyway**.
+3. Qeys opens into the system tray. No install and no Python required.
+
+> `Qeys.exe` is an unsigned standalone build (about 29 MB, Windows 64-bit) that bundles everything it needs. The SmartScreen prompt appears once per machine; after that it launches directly. To remove the prompt entirely an app must be code-signed, which requires a paid certificate.
+
+## Run from source (developers)
 
 Requires **Python 3.8+** on Windows.
 
