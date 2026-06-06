@@ -117,12 +117,14 @@ def _pick_prompt(exclude):
 # Single dict, guarded by _lock, so the hook thread and UI thread never reassign it.
 _lock = threading.Lock()
 _state = {
+    "mode": "test",     # "test" (scored prompts) or "free" (real-time mirror)
     "held": set(),      # keyboard names currently physically held down
     "typed": [],        # characters typed against the current prompt
     "target": "",       # the current prompt
     "total": 0,         # gross characters entered (for accuracy)
     "errors": 0,        # wrong characters entered
     "start": None,      # perf_counter at first keystroke of this prompt
+    "free": [],         # free-typing buffer (real-time mirror mode)
 }
 _running = True
 
@@ -151,22 +153,37 @@ def _on_key(event):
         ctrl = any(k in held for k in ("ctrl", "left ctrl", "right ctrl"))
         held.add(name)
 
-        if ctrl:                      # treat Ctrl+<key> as a shortcut, not text
-            if name == "a":           # Ctrl+A -> restart this prompt
+        # resolve a printable character (or None for tab/shift/enter/ctrl-combos)
+        if name == "space":
+            ch = " "
+        elif len(name) == 1 and not ctrl:
+            ch = name
+        else:
+            ch = None
+
+        if _state["mode"] == "free":          # real-time mirror, no scoring
+            if ctrl and name == "a":          # Ctrl+A -> clear the bar
+                _state["free"].clear()
+            elif name == "backspace":
+                if _state["free"]:
+                    _state["free"].pop()
+            elif name == "enter":
+                _state["free"].append(" ")
+            elif ch is not None:
+                _state["free"].append(ch)
+            return
+
+        # --- test mode (scored against the prompt) ---
+        if ctrl:                              # Ctrl+<key> is a shortcut, not text
+            if name == "a":                   # Ctrl+A -> restart this prompt
                 _restart_current()
             return
         if name == "backspace":
             if _state["typed"]:
                 _state["typed"].pop()
             return
-        if name == "space":
-            ch = " "
-        elif name == "enter":
-            return                    # prompts auto-advance; ignore Enter
-        elif len(name) == 1:
-            ch = name
-        else:
-            return                    # tab / shift / etc. — highlight only
+        if ch is None or name == "enter":     # prompts auto-advance; ignore Enter
+            return
 
         target = _state["target"]
         i = len(_state["typed"])
@@ -242,6 +259,7 @@ class Overlay:
 
         self.icon = None
         self.close_box = self.skip_box = self.grip_box = self.logo_box = None
+        self.mode_test_box = self.mode_free_box = None
         self._mode = None
         self._drag = None
 
@@ -259,6 +277,10 @@ class Overlay:
             return "close"
         if self.skip_box and _inside(x, y, self.skip_box):
             return "skip"
+        if self.mode_test_box and _inside(x, y, self.mode_test_box):
+            return "mode_test"
+        if self.mode_free_box and _inside(x, y, self.mode_free_box):
+            return "mode_free"
         if self.logo_box and _inside(x, y, self.logo_box):
             return "logo"
         if self.grip_box and _inside(x, y, self.grip_box):
@@ -290,10 +312,18 @@ class Overlay:
                 self.hide() if (self.icon and _HAS_TRAY) else self.quit()
             elif self._mode == "skip":
                 self.advance(record=False)
+            elif self._mode == "mode_test":
+                self.set_mode("test")
+            elif self._mode == "mode_free":
+                self.set_mode("free")
             elif self._mode == "logo":
                 webbrowser.open(LOGO_URL)
         self._mode = None
         self._drag = None
+
+    def set_mode(self, mode):
+        with _lock:
+            _state["mode"] = mode
 
     def _logo_photo(self, size):
         size = max(8, (int(size) // 2) * 2)   # quantize to limit cache growth
@@ -328,12 +358,14 @@ class Overlay:
         self._last = now
 
         with _lock:
+            mode = _state["mode"]
             held = set(_state["held"])
             typed = list(_state["typed"])
             target = _state["target"]
             total, errors, start = _state["total"], _state["errors"], _state["start"]
+            free_text = "".join(_state["free"])[-160:]
 
-        if target and len(typed) >= len(target):   # prompt finished
+        if mode == "test" and target and len(typed) >= len(target):  # prompt finished
             self.advance(record=True)
             with _lock:
                 typed = list(_state["typed"])
@@ -354,17 +386,17 @@ class Overlay:
         wpm = (correct / 5) / (elapsed / 60) if elapsed > 0.5 else 0
         acc = (1 - errors / total) * 100 if total else 100
 
-        self.draw(target, typed, wpm, acc)
+        self.draw(mode, target, typed, wpm, acc, free_text)
         self.root.after(int(1000 / FPS), self.tick)
 
-    def draw(self, target, typed, wpm, acc):
+    def draw(self, mode, target, typed, wpm, acc, free_text):
         c = self.canvas
         c.delete("all")
         W, H = self.root.winfo_width(), self.root.winfo_height()
         M = 12
         c.create_rectangle(1, 1, W - 1, H - 1, outline=BORDER)
 
-        # --- top panel (prompt + stats) ---
+        # --- top panel ---
         bar_h = max(74, int(H * 0.24))
         round_rect(c, M, M, W - M, M + bar_h, 10, fill=PANEL, outline=BORDER)
 
@@ -376,54 +408,82 @@ class Overlay:
         c.create_text((self.close_box[0] + self.close_box[2]) / 2,
                       (self.close_box[1] + self.close_box[3]) / 2,
                       text="✕", fill="#ff9aa6", font=("Segoe UI", int(cb * 0.5), "bold"))
-        # skip button
-        self.skip_box = (self.close_box[0] - 10 - cb, cy1, self.close_box[0] - 10, cy1 + cb)
-        round_rect(c, *self.skip_box, 6, fill="#1d2a33", outline="#2f4858")
-        c.create_text((self.skip_box[0] + self.skip_box[2]) / 2,
-                      (self.skip_box[1] + self.skip_box[3]) / 2,
-                      text="▸", fill="#79c0ff", font=("Segoe UI", int(cb * 0.55), "bold"))
+        # skip button (test mode only)
+        x = self.close_box[0] - 10
+        if mode == "test":
+            self.skip_box = (x - cb, cy1, x, cy1 + cb)
+            round_rect(c, *self.skip_box, 6, fill="#1d2a33", outline="#2f4858")
+            c.create_text((self.skip_box[0] + self.skip_box[2]) / 2,
+                          (self.skip_box[1] + self.skip_box[3]) / 2,
+                          text="▸", fill="#79c0ff", font=("Segoe UI", int(cb * 0.55), "bold"))
+            x = self.skip_box[0] - 10
+        else:
+            self.skip_box = None
+
+        # mode toggle: [ Test | Free ] segmented control
+        seg_f = ("Segoe UI", 10, "bold")
+        pw = 48
+        self.mode_free_box = (x - pw, cy1, x, cy1 + cb)
+        self.mode_test_box = (x - 2 * pw - 2, cy1, x - pw - 2, cy1 + cb)
+        for box, label, active in ((self.mode_test_box, "Test", mode == "test"),
+                                   (self.mode_free_box, "Free", mode == "free")):
+            round_rect(c, *box, 6,
+                       fill="#3a2f12" if active else "#1c2128",
+                       outline=ACTIVE_KEY_HEX if active else BORDER)
+            c.create_text((box[0] + box[2]) / 2, (box[1] + box[3]) / 2, text=label,
+                          fill=ACTIVE_KEY_HEX if active else "#8b949e", font=seg_f)
 
         # brand
         c.create_text(M + 16, M + 16, text="Qeys", anchor="w",
                       fill="#444c56", font=("Segoe UI", 11, "bold"))
 
-        # prompt line, sized to fit the panel width
         pad = 18
-        room = W - 2 * M - 2 * pad
-        size = max(11, int(bar_h * 0.34))
-        self.text_font.configure(size=size)
-        cw = self.text_font.measure("m")
-        if cw * max(1, len(target)) > room and len(target):
-            size = max(9, int(size * room / (cw * len(target))))
+        if mode == "test":
+            # prompt line, sized to fit the panel width
+            room = W - 2 * M - 2 * pad
+            size = max(11, int(bar_h * 0.34))
             self.text_font.configure(size=size)
             cw = self.text_font.measure("m")
-        total_w = cw * len(target)
-        x0 = (W - total_w) / 2
-        py = M + bar_h * 0.46
-        for i, ch in enumerate(target):
-            if i < len(typed):
-                col = COL_OK if typed[i] == ch else COL_BAD
-            elif i == len(typed):
-                col = COL_CURSOR
-            else:
-                col = COL_PENDING
-            cx = x0 + i * cw + cw / 2
-            c.create_text(cx, py, text=ch, font=self.text_font, fill=col)
-            if i == len(typed):                      # cursor underline
-                c.create_line(cx - cw / 2 + 1, py + size * 0.72,
-                              cx + cw / 2 - 1, py + size * 0.72,
-                              fill=ACTIVE_KEY_HEX, width=2)
-            elif i < len(typed) and typed[i] != ch and ch == " ":
-                c.create_line(cx - cw / 2 + 1, py + size * 0.72,
-                              cx + cw / 2 - 1, py + size * 0.72,
-                              fill=COL_BAD, width=2)
+            if cw * max(1, len(target)) > room and len(target):
+                size = max(9, int(size * room / (cw * len(target))))
+                self.text_font.configure(size=size)
+                cw = self.text_font.measure("m")
+            x0 = (W - cw * len(target)) / 2
+            py = M + bar_h * 0.46
+            for i, ch in enumerate(target):
+                if i < len(typed):
+                    col = COL_OK if typed[i] == ch else COL_BAD
+                elif i == len(typed):
+                    col = COL_CURSOR
+                else:
+                    col = COL_PENDING
+                cx = x0 + i * cw + cw / 2
+                c.create_text(cx, py, text=ch, font=self.text_font, fill=col)
+                if i == len(typed):                      # cursor underline
+                    c.create_line(cx - cw / 2 + 1, py + size * 0.72,
+                                  cx + cw / 2 - 1, py + size * 0.72,
+                                  fill=ACTIVE_KEY_HEX, width=2)
+                elif i < len(typed) and typed[i] != ch and ch == " ":
+                    c.create_line(cx - cw / 2 + 1, py + size * 0.72,
+                                  cx + cw / 2 - 1, py + size * 0.72,
+                                  fill=COL_BAD, width=2)
 
-        # stats line
-        stat = (f"WPM {wpm:5.0f}     ACC {acc:4.0f}%     "
-                f"last {self.last_wpm:.0f} wpm / {self.last_acc:.0f}%     "
-                f"best {self.best_wpm:.0f}     done {self.completed}")
-        c.create_text(M + pad, M + bar_h * 0.82, text=stat, anchor="w",
-                      fill="#8b949e", font=("Consolas", max(9, int(bar_h * 0.16))))
+            stat = (f"WPM {wpm:5.0f}     ACC {acc:4.0f}%     "
+                    f"last {self.last_wpm:.0f} wpm / {self.last_acc:.0f}%     "
+                    f"best {self.best_wpm:.0f}     done {self.completed}")
+            c.create_text(M + pad, M + bar_h * 0.82, text=stat, anchor="w",
+                          fill="#8b949e", font=("Consolas", max(9, int(bar_h * 0.16))))
+        else:
+            # free mode: real-time mirror of what you type (right-anchored)
+            self.text_font.configure(size=max(13, int(bar_h * 0.40)))
+            c.create_text(W - M - pad, M + bar_h * 0.46, text=free_text + "│",
+                          anchor="e", fill="#e6edf3", font=self.text_font)
+            words = len("".join(free_text).split())
+            c.create_text(M + pad, M + bar_h * 0.82,
+                          text=f"free typing   ·   {len(free_text)} chars   ·   "
+                               f"{words} words   ·   Ctrl+A clears",
+                          anchor="w", fill="#8b949e",
+                          font=("Consolas", max(9, int(bar_h * 0.16))))
 
         # --- keyboard ---
         gap = 6

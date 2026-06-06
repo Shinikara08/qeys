@@ -29,7 +29,10 @@ Qeys flips that:
 ## Features
 
 - 🌐 **Global** — captures keystrokes from any window via a system-wide hook
-- 🎯 **Practice mode** — target prompts with per-character correct/wrong coloring
+- 🔀 **Two modes** (toggle in the bar):
+  - **Test** — scored practice against target prompts
+  - **Free** — a plain real-time mirror of whatever you type
+- 🎯 **Test mode** — target prompts with per-character correct/wrong coloring
 - 📊 **Live WPM + accuracy**, plus last-run and best-WPM, and a completed counter
 - 📌 **Always-on-top**, borderless, semi-transparent overlay
 - 🖱️ **Drag anywhere** to move · **bottom-right grip** to resize (keyboard rescales)
@@ -62,8 +65,9 @@ it into the system tray.
 
 | Action | How |
 |---|---|
-| Type / practice | Type anywhere; scored against the current prompt |
-| Restart current prompt | `Ctrl+A` |
+| Switch Test / Free mode | Click the **Test** / **Free** toggle in the bar |
+| Type / practice | Type anywhere; scored against the current prompt (Test mode) |
+| Restart prompt (Test) / clear bar (Free) | `Ctrl+A` |
 | Delete last char | `Backspace` |
 | Skip to a new prompt | **▸** button (or tray → New prompt) |
 | Move overlay | Drag anywhere on it |
