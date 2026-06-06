@@ -1,5 +1,7 @@
 # Qeys — a no-look typing trainer
 
+![Qeys — train touch typing without looking down](assets/qeys-hero.jpg)
+
 **Qeys** is a lightweight, always-on-top **QWERTY keyboard overlay** for Windows that
 mirrors your **real typing in any app or browser tab** in real time. Press a key
 anywhere and it lights up amber on the overlay, then fades out slowly — so you can
